@@ -800,13 +800,13 @@ exports.status = {
         test.equals(statusSummary.behind, 0);
 
         statusSummary = StatusSummary.parse('?? Not tracked File\nUU Conflicted\n D Removed');
-        test.same(statusSummary.not_added, ['Not tracked File']);
+        test.same(statusSummary.worktree.untracked, ['Not tracked File']);
         test.same(statusSummary.conflicted, ['Conflicted']);
-        test.same(statusSummary.deleted, ['Removed']);
+        test.same(statusSummary.worktree.deleted, ['Removed']);
 
-        statusSummary = StatusSummary.parse(' M Modified\n A Added\nAM Changed');
-        test.same(statusSummary.modified, ['Modified']);
-        test.same(statusSummary.created, ['Added', 'Changed']);
+        statusSummary = StatusSummary.parse(' M Modified\nA  Added\nAM Changed');
+        test.same(statusSummary.worktree.modified, ['Modified', 'Changed']);
+        test.same(statusSummary.index.added, ['Added', 'Changed']);
 
         statusSummary = StatusSummary.parse('## this_branch');
         test.equals(statusSummary.current, 'this_branch');
@@ -817,20 +817,22 @@ exports.status = {
 
     'reports on clean branch': function (test) {
         var StatusSummary = require('../src/StatusSummary');
-        ['M', 'AM', 'UU', 'D'].forEach(function (type) {
+        [' M', 'AM', ' D'].forEach(function (type) {
             test.same(StatusSummary.parse(type + ' file-name.foo').isClean(), false);
         });
-        test.same(StatusSummary.parse('\n').isClean(), true);
+        ['M ', 'A ', 'D '].forEach(function (type) {
+            test.same(StatusSummary.parse(type + ' file-name.foo').isClean(), true);
+        });
 
         test.done();
     },
 
     'empty status': function (test) {
         git.status(function (err, status) {
-            test.equals(0, status.created,      'No new files');
-            test.equals(0, status.deleted,      'No removed files');
-            test.equals(0, status.modified,     'No modified files');
-            test.equals(0, status.not_added,    'No untracked files');
+            test.equals(0, status.index.added,      'No new files');
+            test.equals(0, status.index.deleted,      'No removed files');
+            test.equals(0, status.index.modified,     'No modified files');
+            test.equals(0, status.worktree.untracked,    'No untracked files');
             test.equals(0, status.conflicted,   'No conflicted files');
             test.done();
         });
@@ -841,23 +843,18 @@ exports.status = {
 
     'modified status': function (test) {
         git.status(function (err, status) {
-            test.equals(3, status.created.length,      'No new files');
-            test.equals(0, status.deleted.length,      'No removed files');
-            test.equals(2, status.modified.length,     'No modified files');
-            test.equals(1, status.not_added.length,    'No un-tracked files');
+            test.equals(3, status.index.added.length,      'No new index files');
+            test.equals(0, status.index.deleted.length,      'No removed index files');
+            test.equals(0, status.worktree.deleted.length,      'No removed worktree files');
+            test.equals(3, status.worktree.modified.length,     'No modified worktree files');
+            test.equals(1, status.index.modified.length,     'No modified index files');
+            test.equals(1, status.worktree.untracked.length,    'No un-tracked files');
             test.equals(1, status.conflicted.length,   'No conflicted files');
             test.done();
         });
 
         test.equals(1, mockChildProcesses.length, 'Spawns one process per task');
-        closeWith(' M package.json\n\
-        M src/git.js\n\
-        AM src/index.js \n\
-        A src/newfile.js \n\
-        AM test.js\n\
-        ?? test/ \n\
-        UU test.js\n\
-        ');
+        closeWith(' M package.json\n\M  src/git.js\n\AM src/index.js\n\A  src/newfile.js\n\AM test.js\n\?? test/\n\UU test.js\n');
     }
 };
 

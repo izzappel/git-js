@@ -7,11 +7,23 @@ module.exports = StatusSummary;
  * @constructor
  */
 function StatusSummary () {
-   this.not_added = [];
-   this.deleted = [];
-   this.modified = [];
-   this.created = [];
-   this.conflicted = [];
+   this.index = {
+      deleted: [],
+      modified: [],
+      renamed: [],
+      copied: [],
+      added: []
+   };
+
+   this.worktree = {
+      untracked: [],
+      deleted: [],
+      modified: [],
+      renamed: [],
+      copied: []
+   };
+
+   this.conflicted= [];
 }
 
 /**
@@ -44,8 +56,8 @@ StatusSummary.prototype.tracking = null;
  * @return {boolean}
  */
 StatusSummary.prototype.isClean = function () {
-   return 0 === Object.keys(this).filter(function (name) {
-      return Array.isArray(this[name]) && this[name].length;
+   return 0 === Object.keys(this.worktree).filter(function (name) {
+      return Array.isArray(this.worktree[name]) && this.worktree[name].length;
    }, this).length;
 };
 
@@ -71,23 +83,65 @@ StatusSummary.parsers = {
    },
 
    '??': function (line, status) {
-      status.not_added.push(line);
+      status.worktree.untracked.push(line);
    },
 
-   D: function (line, status) {
-      status.deleted.push(line);
+   'MM': function (line, status) {
+      status.index.modified.push(line);
+      status.worktree.modified.push(line);
    },
-
-   M: function (line, status) {
-      status.modified.push(line);
+   'MD': function (line, status) {
+      status.index.modified.push(line);
+      status.worktree.deleted.push(line);
    },
-
-   A: function (line, status) {
-      status.created.push(line);
+   'M ': function (line, status) {
+      status.index.modified.push(line);
    },
-
-   AM: function (line, status) {
-      status.created.push(line);
+   'AM': function (line, status) {
+      status.index.added.push(line);
+      status.worktree.modified.push(line);
+   },
+   'AD': function (line, status) {
+      status.index.added.push(line);
+      status.worktree.deleted.push(line);
+   },
+   'A ': function (line, status) {
+      status.index.added.push(line);
+   },
+   'DM': function (line, status) {
+      status.index.deleted.push(line);
+      status.worktree.modified.push(line);
+   },
+   'D ': function (line, status) {
+      status.index.deleted.push(line);
+   },
+   'RM': function (line, status) {
+      status.index.renamed.push(line);
+      status.worktree.modified.push(line);
+   },
+   'RD': function (line, status) {
+      status.index.renamed.push(line);
+      status.worktree.deleted.push(line);
+   },
+   'R ': function (line, status) {
+      status.index.renamed.push(line);
+   },
+   'CM': function (line, status) {
+      status.index.copied.push(line);
+      status.worktree.modified.push(line);
+   },
+   'CD': function (line, status) {
+      status.index.copied.push(line);
+      status.worktree.deleted.push(line);
+   },
+   'C ': function (line, status) {
+      status.index.copied.push(line);
+   },
+   ' M': function (line, status) {
+      status.worktree.modified.push(line);
+   },
+   ' D': function (line, status) {
+      status.worktree.deleted.push(line);
    },
 
    UU: function (line, status) {
@@ -97,12 +151,11 @@ StatusSummary.parsers = {
 
 StatusSummary.parse = function (text) {
    var line, handler;
-
-   var lines = text.trim().split('\n');
+   var lines = text.split('\n');
    var status = new StatusSummary();
 
    while (line = lines.shift()) {
-      line = line.trim().match(/(\S+)\s+(.*)/);
+      line = line.match(/(..)\s(.*)/);
       if (line && (handler = StatusSummary.parsers[line[1]])) {
          handler(line[2], status);
       }
